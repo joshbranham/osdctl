@@ -1292,7 +1292,7 @@ osdctl cluster cad [flags]
 Run a manual investigation on the Configuration Anomaly Detection (CAD) cluster.
 
 This command schedules a Tekton PipelineRun on the appropriate CAD cluster (stage or production)
-to run an investigation against a target cluster.
+to run an investigation against a target cluster. The results will be written to a backplane report.
 
 Prerequisites:
   - Connected to the target cluster's OCM environment (production or stage)
@@ -1302,17 +1302,29 @@ Available Investigations:
   chgm, cmbb, can-not-retrieve-updates, ai, cpd, etcd-quota-low,
   insightsoperatordown, machine-health-check, must-gather, upgrade-config
 
-Example:
-  # Run a change management investigation on a production cluster
-  osdctl cluster cad run \
-    --cluster-id 1a2b3c4d5e6f7g8h9i0j \
-    --investigation chgm \
-    --environment production \
-    --reason "OHSS-12345"
+Examples:
+```bash
+# Run a change management investigation on a production cluster
+osdctl cluster cad run \
+  --cluster-id 1a2b3c4d5e6f7g8h9i0j \
+  --investigation chgm \
+  --environment production \
+  --reason "OHSS-12345"
+
+# Run a dry-run investigation (does not create a report)
+osdctl cluster cad run \
+  --cluster-id 1a2b3c4d5e6f7g8h9i0j \
+  --investigation chgm \
+  --environment production \
+  --reason "OHSS-12345" \
+  --dry-run
+```
 
 Note:
   After the investigation completes (may take several minutes), view results using:
-    osdctl cluster reports list -C <cluster-id> -l 1
+```bash
+osdctl cluster reports list -C <cluster-id> -l 1
+```
 
   You must be connected to the target cluster's OCM environment to view its reports.
 
@@ -1327,7 +1339,8 @@ osdctl cluster cad run [flags]
       --cluster string                   The name of the kubeconfig cluster to use
   -C, --cluster-id string                Cluster ID (internal or external)
       --context string                   The name of the kubeconfig context to use
-  -e, --environment string               Environment of the cluster we want to run the investigation on. Allowed values: "stage" or "production"
+  -d, --dry-run                          Dry-Run: Run the investigation with the dry-run flag. This will not create a report.
+  -e, --environment string               Environment in which the target cluster runs. Allowed values: "stage" or "production"
   -h, --help                             help for run
       --insecure-skip-tls-verify         If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
   -i, --investigation string             Investigation name
