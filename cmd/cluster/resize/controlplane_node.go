@@ -8,13 +8,8 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
 	"strings"
-	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/ec2"
-	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	cmv1 "github.com/openshift-online/ocm-sdk-go/clustersmgmt/v1"
 	machinev1 "github.com/openshift/api/machine/v1"
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
@@ -149,49 +144,6 @@ const (
 	Cancel                          = 4
 )
 
-func retryCancelDialog(procedure string) (optionsDialogResponse, error) {
-	fmt.Printf("Do you want to retry %s or cancel this command? (retry/cancel):\n", procedure)
-
-	reader := bufio.NewReader(os.Stdin)
-
-	responseBytes, _, err := reader.ReadLine()
-	if err != nil {
-		return Undefined, fmt.Errorf("reader.ReadLine() resulted in an error: %s", err)
-	}
-
-	response := strings.ToUpper(string(responseBytes))
-
-	switch response {
-	case "RETRY":
-		return Retry, nil
-	case "CANCEL":
-		return Cancel, nil
-	default:
-		fmt.Println("Invalid response, expected 'retry' or 'cancel' (case-insensitive).")
-		return retryCancelDialog(procedure)
-	}
-}
-
-func withRetryCancelOption(fn func() error, procedure string) (err error) {
-	err = fn()
-	if err == nil {
-		return nil
-	}
-	dialogResponse, err := retryCancelDialog(procedure)
-	if err != nil {
-		return err
-	}
-
-	switch dialogResponse {
-	case Retry:
-		return withRetryCancelOption(fn, procedure)
-	case Cancel:
-		return errors.New("exiting")
-	default:
-		return errors.New("unhandled enumerator in withRetryCancelOption")
-	}
-}
-
 func retrySkipCancelDialog(procedure string) (optionsDialogResponse, error) {
 	fmt.Printf("Do you want to retry %[1]s, skip %[1]s or cancel this command? (retry/skip/cancel):\n", procedure)
 
@@ -313,112 +265,6 @@ func (o *controlPlane) drainNode(nodeID string, reason string) error {
 	return nil
 }
 
-func stopNode(ctx context.Context, awsClient resizeControlPlaneNodeAWSClient, nodeID string) error {
-	printer.PrintfGreen("Stopping ec2 instance %s. This might take a minute or two...\n", nodeID)
-
-	_, err := awsClient.StopInstances(ctx, &ec2.StopInstancesInput{
-		InstanceIds: []string{nodeID},
-	})
-	if err != nil {
-		return fmt.Errorf("unable to request stop of ec2 instance: %v", err)
-	}
-
-	waiter := ec2.NewInstanceStoppedWaiter(awsClient)
-	describeInstancesInput := &ec2.DescribeInstancesInput{
-		InstanceIds: []string{nodeID},
-	}
-
-	err = waiter.Wait(ctx, describeInstancesInput, 10*time.Minute)
-	if err != nil {
-		return fmt.Errorf("unable to stop or timed out while stopping ec2 instance: %s", err)
-	}
-	return nil
-}
-
-func modifyInstanceAttribute(ctx context.Context, awsClient resizeControlPlaneNodeAWSClient, nodeID string, newMachineType string) error {
-	printer.PrintlnGreen("Modifying machine type of instance:", nodeID, "to", newMachineType)
-
-	modifyInstanceAttributeInput := &ec2.ModifyInstanceAttributeInput{InstanceId: &nodeID, InstanceType: &types.AttributeValue{Value: &newMachineType}}
-
-	_, err := awsClient.ModifyInstanceAttribute(ctx, modifyInstanceAttributeInput)
-	if err != nil {
-		return fmt.Errorf("unable to modify ec2 instance: %v", err)
-	}
-	return nil
-}
-
-func startNode(ctx context.Context, awsClient resizeControlPlaneNodeAWSClient, nodeID string) error {
-	printer.PrintfGreen("Starting instance %s. This might take a minute or two...\n", nodeID)
-
-	_, err := awsClient.StartInstances(ctx, &ec2.StartInstancesInput{
-		InstanceIds: []string{nodeID},
-	})
-	if err != nil {
-		return fmt.Errorf("unable to request start of ec2 instance: %v", err)
-	}
-
-	waiter := ec2.NewInstanceRunningWaiter(awsClient)
-	describeInstancesInput := &ec2.DescribeInstancesInput{
-		InstanceIds: []string{nodeID},
-	}
-
-	err = waiter.Wait(ctx, describeInstancesInput, 10*time.Minute)
-	if err != nil {
-		return fmt.Errorf("unable to run or timed out while running ec2 instance: %s", err)
-	}
-	return nil
-}
-
-func uncordonNode(nodeID string) error {
-	printer.PrintlnGreen("Uncordoning node", nodeID)
-	cmd := fmt.Sprintf("oc adm uncordon %s", nodeID)
-	output, err := exec.Command("bash", "-c", cmd).CombinedOutput()
-
-	if err != nil {
-		fmt.Printf("Failed to uncordon node: %s", strings.TrimSpace(string(output)))
-		return err
-	}
-	return nil
-}
-
-func getNodeAwsInstanceData(ctx context.Context, node string, awsClient resizeControlPlaneNodeAWSClient) (string, string, error) {
-	params := &ec2.DescribeInstancesInput{
-		Filters: []types.Filter{
-			{
-				Name:   aws.String("private-dns-name"),
-				Values: []string{node},
-			},
-		},
-	}
-	ret, err := awsClient.DescribeInstances(ctx, params)
-	if err != nil {
-		return "", "", err
-	}
-
-	if len(ret.Reservations) == 0 || len(ret.Reservations[0].Instances) == 0 {
-		return "", "", errors.New("no instances found for the given node")
-	}
-
-	awsInstanceID := *ret.Reservations[0].Instances[0].InstanceId
-
-	var machineName string
-	tags := ret.Reservations[0].Instances[0].Tags
-	for _, t := range tags {
-		if *t.Key == "Name" {
-			machineName = *t.Value
-			break
-		}
-	}
-
-	if machineName == "" {
-		return "", "", errors.New("could not retrieve node machine name")
-	}
-
-	fmt.Println("Node", node, "found as AWS internal InstanceId", awsInstanceID, "with machine name", machineName)
-
-	return machineName, awsInstanceID, nil
-}
-
 func (o *controlPlane) patchMachineType(machine string, machineType string, reason string) error {
 	printer.PrintlnGreen("Patching machine type of machine", machine, "to", machineType)
 	err := bpelevate.RunElevate([]string{
@@ -429,13 +275,6 @@ func (o *controlPlane) patchMachineType(machine string, machineType string, reas
 		return fmt.Errorf("could not patch machine type:\n%s", err)
 	}
 	return nil
-}
-
-type resizeControlPlaneNodeAWSClient interface {
-	ec2.DescribeInstancesAPIClient
-	StartInstances(ctx context.Context, params *ec2.StartInstancesInput, optFns ...func(*ec2.Options)) (*ec2.StartInstancesOutput, error)
-	StopInstances(ctx context.Context, params *ec2.StopInstancesInput, optFns ...func(*ec2.Options)) (*ec2.StopInstancesOutput, error)
-	ModifyInstanceAttribute(ctx context.Context, params *ec2.ModifyInstanceAttributeInput, optFns ...func(*ec2.Options)) (*ec2.ModifyInstanceAttributeOutput, error)
 }
 
 // run performs a control plane resize leveraging control plane machine sets
