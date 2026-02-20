@@ -43,30 +43,30 @@ func (o *Printer) PrintEvents(filterEvents []types.Event, printFields []string) 
 		sessionIssuer := rawEventDetails.UserIdentity.SessionContext.SessionIssuer.UserName
 		eventStringBuilder.WriteString("\n")
 		if _, ok := tableFilter["event"]; ok && filterEvents[i].EventName != nil {
-			eventStringBuilder.WriteString(fmt.Sprintf("%v | ", *filterEvents[i].EventName))
+			_, _ = fmt.Fprintf(&eventStringBuilder, "%v | ", *filterEvents[i].EventName)
 		}
 		if _, ok := tableFilter["time"]; ok && filterEvents[i].EventTime != nil {
-			eventStringBuilder.WriteString(fmt.Sprintf("%v | ", filterEvents[i].EventTime.String()))
+			_, _ = fmt.Fprintf(&eventStringBuilder, "%v | ", filterEvents[i].EventTime.String())
 		}
 		if _, ok := tableFilter["username"]; ok && filterEvents[i].Username != nil {
-			eventStringBuilder.WriteString(fmt.Sprintf("Username: %v | ", *filterEvents[i].Username))
+			_, _ = fmt.Fprintf(&eventStringBuilder, "Username: %v | ", *filterEvents[i].Username)
 		}
 		if _, ok := tableFilter["arn"]; ok && sessionIssuer != "" {
-			eventStringBuilder.WriteString(fmt.Sprintf("ARN: %v | ", sessionIssuer))
+			_, _ = fmt.Fprintf(&eventStringBuilder, "ARN: %v | ", sessionIssuer)
 		}
 
 		for _, resource := range filterEvents[i].Resources {
 			if _, ok := tableFilter["resource-name"]; ok && resource.ResourceName != nil {
-				eventStringBuilder.WriteString(fmt.Sprintf("Resource Name: %v | ", *resource.ResourceName))
+				_, _ = fmt.Fprintf(&eventStringBuilder, "Resource Name: %v | ", *resource.ResourceName)
 			}
 			if _, ok := tableFilter["resource-type"]; ok && resource.ResourceType != nil {
-				eventStringBuilder.WriteString(fmt.Sprintf("Resource Type: %v | ", *resource.ResourceType))
+				_, _ = fmt.Fprintf(&eventStringBuilder, "Resource Type: %v | ", *resource.ResourceType)
 			}
 		}
 
 		if o.printUrl && filterEvents[i].CloudTrailEvent != nil {
 			if err == nil {
-				eventStringBuilder.WriteString(fmt.Sprintf("%v", generateLink(*rawEventDetails)))
+				_, _ = fmt.Fprintf(&eventStringBuilder, "%v", generateLink(*rawEventDetails))
 			} else {
 				fmt.Println("EventLink: <not available>")
 			}
@@ -78,7 +78,7 @@ func (o *Printer) PrintEvents(filterEvents []types.Event, printFields []string) 
 
 // generateLink generates a hyperlink to aws cloudTrail event
 // based on the provided RawEventDetails.
-func generateLink(raw RawEventDetails) (url_link string) {
+func generateLink(raw RawEventDetails) (urlLink string) {
 	str1 := "https://"
 	str2 := ".console.aws.amazon.com/cloudtrailv2/home?region="
 	str3 := "#/events/"
@@ -87,12 +87,12 @@ func generateLink(raw RawEventDetails) (url_link string) {
 	eventId := raw.EventId
 
 	var url = str1 + eventRegion + str2 + eventRegion + str3 + eventId
-	url_link = url
+	urlLink = url
 
-	return url_link
+	return urlLink
 }
 
-// ValidateTable checks for the string list given and returns error
+// ValidateFormat checks for the string list given and returns error
 // if it does not match.
 func ValidateFormat(table []string) error {
 	allowedKeys := map[string]struct{}{
