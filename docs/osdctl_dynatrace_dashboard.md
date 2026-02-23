@@ -1,6 +1,6 @@
 ## osdctl dynatrace dashboard
 
-Get the Dyntrace Cluster Overview Dashboard for a given MC or HCP cluster
+Get the Dynatrace Cluster Overview Dashboard for a given MC or HCP cluster
 
 ```
 osdctl dynatrace dashboard --cluster-id CLUSTER_ID [flags]

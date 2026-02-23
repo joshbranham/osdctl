@@ -86,7 +86,7 @@
   - `list` - List the cost of each Account/OU under given OU
   - `reconcile` - Checks if there's a cost category for every OU. If an OU is missing a cost category, creates the cost category
 - `dynatrace` - Dynatrace related utilities
-  - `dashboard --cluster-id CLUSTER_ID` - Get the Dyntrace Cluster Overview Dashboard for a given MC or HCP cluster
+  - `dashboard --cluster-id CLUSTER_ID` - Get the Dynatrace Cluster Overview Dashboard for a given MC or HCP cluster
   - `gather-logs --cluster-id <cluster-identifier>` - Gather all Pod logs and Application event from HCP
   - `logs --cluster-id <cluster-identifier>` - Fetch logs from Dynatrace
   - `url --cluster-id <cluster-identifier>` - Get the Dynatrace Tenant URL for a given MC or HCP cluster
@@ -2620,7 +2620,7 @@ osdctl dynatrace [flags]
 
 ### osdctl dynatrace dashboard
 
-Get the Dyntrace Cluster Overview Dashboard for a given MC or HCP cluster
+Get the Dynatrace Cluster Overview Dashboard for a given MC or HCP cluster
 
 ```
 osdctl dynatrace dashboard --cluster-id CLUSTER_ID [flags]
