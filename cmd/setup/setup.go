@@ -22,6 +22,8 @@ const (
 	VaultAddress            = "vault_address"
 	CloudTrailCmdLists      = "cloudtrail_cmd_lists"
 	GitLabToken             = "gitlab_access"
+	CADGrafanaURL           = "cad_grafana_url"
+	CADAWSAccountID         = "cad_aws_account_id"
 	JiraTokenRegex          = "^[A-Z0-9]{7}$"        // #nosec G101
 	PdTokenRegex            = "^[a-zA-Z0-9+_-]{20}$" // #nosec G101
 	AwsAccountRegex         = "^[0-9]{12}$"
@@ -30,6 +32,7 @@ const (
 	DtVaultPathRegex        = `^[a-zA-Z0-9\-/]+$`
 	CloudTrailCmdListsRegex = `^\s*-\s+.*$`
 	GitLabTokenRegex        = `^[a-zA-Z0-9]{20}$` // #nosec G101
+	URLRegex                = `^https?:\/\/[a-zA-Z0-9.-]+(:\d+)?$`
 )
 
 // NewCmdSetup implements the setup command
@@ -52,6 +55,8 @@ func NewCmdSetup() *cobra.Command {
 				JiraToken,
 				CloudTrailCmdLists,
 				GitLabToken,
+				CADGrafanaURL,
+				CADAWSAccountID,
 			}
 
 			values := make(map[string]string)
@@ -129,6 +134,19 @@ func NewCmdSetup() *cobra.Command {
 
 				if value == "" {
 					value = defaultValue
+				}
+
+				var err error
+				if value != "" && value != defaultValue {
+					switch key {
+					case CADGrafanaURL:
+						_, err = ValidateURL(value)
+					case CADAWSAccountID:
+						_, err = ValidateAWSAccount(value)
+					}
+				}
+				if err != nil {
+					return err
 				}
 
 				if value != "" && value != defaultValue {
@@ -246,4 +264,17 @@ func ValidateGitLabToken(GitLabtoken string) (string, error) {
 		return "", errors.New("invalid GitLab token")
 	}
 	return GitLabtoken, nil
+}
+
+func ValidateURL(url string) (string, error) {
+	url = strings.TrimSpace(url)
+	url = strings.TrimSuffix(url, "/")
+	match, err := regexp.MatchString(URLRegex, url)
+	if err != nil {
+		return "", err
+	}
+	if !match {
+		return "", errors.New("invalid URL")
+	}
+	return url, nil
 }

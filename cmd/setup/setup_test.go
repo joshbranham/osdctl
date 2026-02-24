@@ -127,6 +127,54 @@ var _ = Describe("Validation Functions", func() {
 			Expect(err).To(HaveOccurred())
 		})
 	})
+
+	Context("URL Validation", func() {
+		It("should validate correct HTTP URL", func() {
+			url, err := ValidateURL("http://grafana.example.com")
+			Expect(err).To(BeNil())
+			Expect(url).To(Equal("http://grafana.example.com"))
+		})
+
+		It("should validate correct HTTPS URL", func() {
+			url, err := ValidateURL("https://grafana.example.com")
+			Expect(err).To(BeNil())
+			Expect(url).To(Equal("https://grafana.example.com"))
+		})
+
+		It("should validate URL with port", func() {
+			url, err := ValidateURL("https://grafana.example.com:8080")
+			Expect(err).To(BeNil())
+			Expect(url).To(Equal("https://grafana.example.com:8080"))
+		})
+
+		It("should fail invalid URL without protocol", func() {
+			_, err := ValidateURL("grafana.example.com")
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("should fail invalid URL with special characters", func() {
+			_, err := ValidateURL("https://grafana example.com")
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("should trim whitespace from URL", func() {
+			url, err := ValidateURL("  https://grafana.example.com  ")
+			Expect(err).To(BeNil())
+			Expect(url).To(Equal("https://grafana.example.com"))
+		})
+
+		It("should trim trailing slash from URL", func() {
+			url, err := ValidateURL("https://grafana.example.com/")
+			Expect(err).To(BeNil())
+			Expect(url).To(Equal("https://grafana.example.com"))
+		})
+
+		It("should trim both whitespace and trailing slash", func() {
+			url, err := ValidateURL("  https://grafana.example.com/  ")
+			Expect(err).To(BeNil())
+			Expect(url).To(Equal("https://grafana.example.com"))
+		})
+	})
 })
 
 var _ = Describe("NewCmdSetup Command", func() {
@@ -148,6 +196,8 @@ var _ = Describe("NewCmdSetup Command", func() {
 			JiraToken:              "ABC1234",
 			CloudTrailCmdLists:     "  - aws s3 ls",
 			GitLabToken:            "abcdEFGHijklMNOPqrst",
+			CADGrafanaURL:          "https://grafana.example.com",
+			CADAWSAccountID:        "844056765545",
 		} {
 			viper.SetDefault(k, v)
 		}
@@ -156,15 +206,17 @@ var _ = Describe("NewCmdSetup Command", func() {
 	Context("When user provides valid inputs", func() {
 		It("should correctly set and save the configuration", func() {
 			inputs := []string{
-				"123456789012",              // ProdJumproleConfigKey
-				"http://proxy.example.com",  // AwsProxy
-				"987654321098",              // StageJumproleConfigKey
-				"dt-vault-path",             // DtVaultPath (optional)
-				"https://vault.example.com", // VaultAddress (optional)
-				"abcdEFGHijklMNOPqrst",      // PdUserToken (optional)
-				"ABC1234",                   // JiraToken (optional)
-				"  - aws s3 ls",             // CloudTrailCmdLists (optional)
-				"abcdEFGHijklMNOPqrst",      // GitLabToken (optional)
+				"123456789012",                // ProdJumproleConfigKey
+				"http://proxy.example.com",    // AwsProxy
+				"987654321098",                // StageJumproleConfigKey
+				"dt-vault-path",               // DtVaultPath (optional)
+				"https://vault.example.com",   // VaultAddress (optional)
+				"abcdEFGHijklMNOPqrst",        // PdUserToken (optional)
+				"ABC1234",                     // JiraToken (optional)
+				"  - aws s3 ls",               // CloudTrailCmdLists (optional)
+				"abcdEFGHijklMNOPqrst",        // GitLabToken (optional)
+				"https://grafana.example.com", // CADGrafanaURL (optional)
+				"844056765545",                // CADAWSAccountID (optional)
 			}
 			inputBuffer := bytes.NewBufferString(strings.Join(inputs, "\n"))
 			reader := bufio.NewReader(inputBuffer)
@@ -182,6 +234,8 @@ var _ = Describe("NewCmdSetup Command", func() {
 			Expect(viper.GetString(JiraToken)).To(Equal("ABC1234"))
 			Expect(viper.GetString(CloudTrailCmdLists)).To(Equal("  - aws s3 ls"))
 			Expect(viper.GetString(GitLabToken)).To(Equal("abcdEFGHijklMNOPqrst"))
+			Expect(viper.GetString(CADGrafanaURL)).To(Equal("https://grafana.example.com"))
+			Expect(viper.GetString(CADAWSAccountID)).To(Equal("844056765545"))
 		})
 	})
 })
