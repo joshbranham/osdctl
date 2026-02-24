@@ -2,6 +2,8 @@ package dynatrace
 
 import (
 	"fmt"
+	"os/exec"
+	"runtime"
 
 	"github.com/spf13/cobra"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -12,11 +14,32 @@ var (
 	clusterId     string
 )
 
+// openBrowser opens the specified URL in the default browser
+func openBrowser(url string) error {
+	var cmd string
+	var args []string
+
+	switch runtime.GOOS {
+	case "linux":
+		cmd = "xdg-open"
+	case "windows":
+		cmd = "rundll32"
+		args = []string{"url.dll,FileProtocolHandler"}
+	case "darwin":
+		cmd = "open"
+	default:
+		return fmt.Errorf("unsupported platform")
+	}
+
+	args = append(args, url)
+	return exec.Command(cmd, args...).Start()
+}
+
 func newCmdDashboard() *cobra.Command {
 	urlCmd := &cobra.Command{
 		Use:               "dashboard --cluster-id CLUSTER_ID",
 		Aliases:           []string{"dash"},
-		Short:             "Get the Dyntrace Cluster Overview Dashboard for a given MC or HCP cluster",
+		Short:             "Get the Dynatrace Cluster Overview Dashboard for a given MC or HCP cluster",
 		DisableAutoGenTag: true,
 		Run: func(cmd *cobra.Command, args []string) {
 			// We need the Dynatrace URL
@@ -42,6 +65,12 @@ func newCmdDashboard() *cobra.Command {
 			// Tell the user
 			dashUrl := hcpCluster.DynatraceURL + "ui/apps/dynatrace.dashboards/dashboard/" + id + "#vfilter__id=" + hcpCluster.externalID
 			fmt.Printf("\n\nDashboard URL:\n  %s\n", dashUrl)
+
+			// Open the dashboard in the default browser
+			fmt.Println("\nOpening dashboard in your browser...")
+			if err := openBrowser(dashUrl); err != nil {
+				fmt.Printf("Could not open browser automatically: %s\n", err)
+			}
 		},
 	}
 
